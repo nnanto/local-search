@@ -17,7 +17,7 @@ impl SqliteLocalSearchEngine {
     pub fn new(db_path: &str, embedder: Option<LocalEmbedder>) -> anyhow::Result<Self> {
         info!("Creating new SqliteLocalSearch for path: {}", db_path);
         let conn = Connection::open(db_path).map_err(|e| anyhow!("Failed to open database: {}", e))?;
-        let embedder = embedder.unwrap_or_else(|| LocalEmbedder::default().unwrap());
+        let embedder = embedder.unwrap_or_else(|| LocalEmbedder::new_with_default_model().unwrap());
         let lfts = SqliteLocalSearchEngine { db_path: db_path.to_string(), conn, embedder };
         info!("SqliteLocalSearch initialization complete: {}", db_path);
         Ok(lfts)

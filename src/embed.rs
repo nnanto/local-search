@@ -19,7 +19,7 @@ impl LocalEmbedder {
     }
 
     /// Creates a new embedder with the default model.
-    pub fn default() -> Result<Self> {
+    pub fn new_with_default_model() -> Result<Self> {
         Self::new(None)
     }
     

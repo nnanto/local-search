@@ -67,7 +67,7 @@ fn main() -> anyhow::Result<()> {
             println!("{} Indexing documents from: {}", "📚".green(), path);
             
             // Initialize the search engine
-            let embedder = LocalEmbedder::default()?;
+            let embedder = LocalEmbedder::new_with_default_model()?;
             let engine = SqliteLocalSearchEngine::new(&db, Some(embedder))?;
             engine.create_table()?;
             
@@ -103,7 +103,7 @@ fn main() -> anyhow::Result<()> {
             }
             validate_db_presence(&db)?;
             // Initialize the search engine
-            let embedder = LocalEmbedder::default()?;
+            let embedder = LocalEmbedder::new_with_default_model()?;
             let engine = SqliteLocalSearchEngine::new(&db, Some(embedder))?;
             
             // Parse search type

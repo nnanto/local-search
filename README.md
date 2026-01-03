@@ -8,7 +8,6 @@ A fast, local search engine built in Rust with vector embeddings and SQLite stor
 - 📁 Local file indexing and search
 - 🗄️ SQLite-based storage
 - 📚 Both library and CLI interfaces
-- ⚡ Fast and efficient
 
 ## Installation
 
@@ -57,7 +56,7 @@ let results = engine.search("example", 5)?;
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/local_search.git
+git clone https://github.com/nnanto/local_search.git
 cd local_search
 
 # Run tests

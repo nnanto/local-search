@@ -1645,6 +1645,8 @@ dependencies = [
  "llm",
  "log",
  "rusqlite",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

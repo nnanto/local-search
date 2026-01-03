@@ -1,0 +1,60 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+    {
+        "type": "lldb",
+        "request": "launch",
+        "name": "Launch",
+        "program": "${workspaceFolder}/target/debug/local_search_engine",
+        "args": [],
+        "cwd": "${workspaceFolder}"
+    },
+        {
+            "name": "Debug unit tests in library 'local_search_engine'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test"
+                ]
+            }
+        },
+        {
+            "name": "Debug executable 'local_search_engine'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--bin=local_search_engine"
+                ]
+            },
+            "args": []
+        },
+        {
+            "name": "Debug unit tests in executable 'local_search_engine'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--bin=local_search_engine"
+                ]
+            }
+        },
+        {
+            "name": "Debug integration test 'embed_integration'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=embed_integration"
+                ]
+            }
+        }
+    ]
+}

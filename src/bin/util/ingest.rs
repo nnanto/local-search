@@ -1,8 +1,8 @@
 use local_search::DocumentRequest;
+use log::{debug, info};
 #[cfg(feature = "cli")]
 use serde_json;
 use std::path::Path;
-use log::{debug, info};
 
 #[cfg(feature = "cli")]
 /// Ingestor that processes JSON files containing document arrays.
@@ -13,7 +13,6 @@ pub struct JsonFileIngestor {
 
 #[cfg(feature = "cli")]
 impl JsonFileIngestor {
-
     /// Creates a new JSON file ingestor with the specified document indexer.
     pub fn new(indexer: Box<dyn local_search::DocumentIndexer>) -> Self {
         JsonFileIngestor { indexer }
@@ -25,19 +24,19 @@ impl JsonFileIngestor {
 
         std::fs::metadata(&path).expect("Path does not exist");
         info!("Starting ingestion with path: {}", path_str);
-        
+
         if path.is_dir() {
             let mut processed_files = 0;
             for entry in std::fs::read_dir(path)? {
                 let entry = entry?;
                 let file_path = entry.path();
                 debug!("Processing file: {:?}", file_path);
-                if file_path.is_file() && 
-                   file_path.extension().and_then(|s| s.to_str()) == Some("json") {
+                if file_path.is_file()
+                    && file_path.extension().and_then(|s| s.to_str()) == Some("json")
+                {
                     self.process_json_file(&file_path)?;
                     processed_files += 1;
-                }
-                else{
+                } else {
                     debug!("Skipping non-JSON file: {:?}", file_path);
                 }
             }
@@ -46,10 +45,10 @@ impl JsonFileIngestor {
             self.process_json_file(path)?;
             info!("Processed single JSON file: {:?}", path);
         }
-        
+
         Ok(())
     }
-    
+
     fn process_json_file(&self, file_path: &Path) -> anyhow::Result<()> {
         let data = std::fs::read_to_string(file_path)?;
         let doc_requests: Vec<DocumentRequest> = serde_json::from_str(&data)?;
@@ -67,7 +66,6 @@ pub struct RawFileIngestor {
 }
 
 impl RawFileIngestor {
-
     /// Creates a new raw file ingestor with the specified document indexer.
     pub fn new(indexer: Box<dyn local_search::DocumentIndexer>) -> Self {
         RawFileIngestor { indexer }
@@ -82,7 +80,7 @@ impl RawFileIngestor {
 
         std::fs::metadata(&path).expect("Path does not exist");
         info!("Starting ingestion with path: {}", path_str);
-        
+
         if path.is_dir() {
             let mut processed_files = 0;
             for entry in std::fs::read_dir(path)? {
@@ -92,8 +90,7 @@ impl RawFileIngestor {
                 if file_path.is_file() && valid_file_fn(&file_path) {
                     self.process_file(&file_path)?;
                     processed_files += 1;
-                }
-                else{
+                } else {
                     debug!("Skipping non-file entry: {:?}", file_path);
                 }
             }
@@ -102,10 +99,10 @@ impl RawFileIngestor {
             self.process_file(path)?;
             info!("Processed single file: {:?}", path);
         }
-        
+
         Ok(())
     }
-    
+
     fn process_file(&self, file_path: &Path) -> anyhow::Result<()> {
         let content = std::fs::read_to_string(file_path)?;
         let doc_request = DocumentRequest {

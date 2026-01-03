@@ -38,5 +38,10 @@ pub trait DocumentIndexer {
 
 /// Trait for performing searches on indexed documents.
 pub trait LocalSearch {
-    fn search(&self, query: &str, search_type: SearchType, top: Option<i8>) -> anyhow::Result<Vec<SearchResult>>;
+    fn search(
+        &self,
+        query: &str,
+        search_type: SearchType,
+        top: Option<i8>,
+    ) -> anyhow::Result<Vec<SearchResult>>;
 }

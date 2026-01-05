@@ -14,7 +14,7 @@ A fast, local search engine built in Rust with vector embeddings and SQLite stor
 ### As a CLI tool
 
 ```bash
-cargo install local_search --features cli
+cargo install local-search --features cli
 ```
 
 ### As a library
@@ -30,10 +30,10 @@ local_search = "0.1.0"
 
 ```bash
 # Index documents
-local_search index /path/to/documents
+local-search index /path/to/documents
 
 # Search for content
-local_search search "your query here"
+local-search search "your query here"
 ```
 
 ## Library Usage
@@ -56,8 +56,8 @@ let results = engine.search("example", 5)?;
 
 ```bash
 # Clone the repository
-git clone https://github.com/nnanto/local_search.git
-cd local_search
+git clone https://github.com/nnanto/local-search.git
+cd local-search
 
 # Run tests
 cargo test

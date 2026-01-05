@@ -38,6 +38,6 @@ path = "src/lib.rs"
 
 
 [[bin]]
-name = "local_search"
+name = "local-search"
 path = "src/bin/main.rs"
 required-features = ["cli"]

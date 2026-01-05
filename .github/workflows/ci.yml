@@ -200,16 +200,7 @@ jobs:
           ```bash
           local-search --help
           ```
-
-  # New job to update 'latest' release
-  update-latest:
-    name: Update Latest Release
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [release]
-    steps:
-    - uses: actions/checkout@v4
-    
+          
     - name: Update latest release
       uses: softprops/action-gh-release@v2
       with:

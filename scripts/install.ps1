@@ -2,10 +2,10 @@
 
 param(
     [Parameter()]
-    [string]$InstallDir = "$env:LOCALAPPDATA\Programs\local-search",
+    [string]$InstallDir = "$env:LOCALAPPDATA\Programs\localsearch",
     
     [Parameter()]
-    [string]$GitHubRepo = "nnanto/local-search",
+    [string]$GitHubRepo = "nnanto/localsearch",
     
     [Parameter()]
     [switch]$Help
@@ -28,18 +28,18 @@ function Write-Error {
 }
 
 function Show-Help {
-    Write-Host "local-search Installation Script for Windows"
+    Write-Host "localsearch Installation Script for Windows"
     Write-Host ""
     Write-Host "Usage: .\install.ps1 [OPTIONS]"
     Write-Host ""
     Write-Host "Options:"
-    Write-Host "  -InstallDir DIR     Installation directory (default: $env:LOCALAPPDATA\Programs\local-search)"
-    Write-Host "  -GitHubRepo REPO    GitHub repository (default: nnanto/local-search)"
+    Write-Host "  -InstallDir DIR     Installation directory (default: $env:LOCALAPPDATA\Programs\localsearch)"
+    Write-Host "  -GitHubRepo REPO    GitHub repository (default: nnanto/localsearch)"
     Write-Host "  -Help               Show this help message"
     Write-Host ""
     Write-Host "Examples:"
     Write-Host "  .\install.ps1"
-    Write-Host "  .\install.ps1 -InstallDir 'C:\Tools\local-search'"
+    Write-Host "  .\install.ps1 -InstallDir 'C:\Tools\localsearch'"
 }
 
 function Test-Administrator {
@@ -63,7 +63,7 @@ function Add-ToPath {
 }
 
 function Install-LocalSearch {
-    $archiveName = "local-search-windows-x86_64.zip"
+    $archiveName = "localsearch-windows-x86_64.zip"
     $downloadUrl = "https://github.com/$GitHubRepo/releases/latest/download/$archiveName"
     
     Write-Status "Download URL: $downloadUrl"
@@ -75,12 +75,12 @@ function Install-LocalSearch {
     try {
         # Download archive
         $archivePath = Join-Path $tmpDir $archiveName
-        Write-Status "Downloading local-search..."
+        Write-Status "Downloading localsearch..."
         
         try {
             Invoke-WebRequest -Uri $downloadUrl -OutFile $archivePath -UseBasicParsing
         } catch {
-            Write-Error "Failed to download local-search: $_"
+            Write-Error "Failed to download localsearch: $_"
             return $false
         }
         
@@ -100,8 +100,8 @@ function Install-LocalSearch {
         }
         
         # Copy binary
-        $binaryPath = Join-Path $tmpDir "local-search.exe"
-        $targetPath = Join-Path $InstallDir "local-search.exe"
+        $binaryPath = Join-Path $tmpDir "localsearch.exe"
+        $targetPath = Join-Path $InstallDir "localsearch.exe"
         
         if (!(Test-Path $binaryPath)) {
             Write-Error "Binary not found in extracted archive"
@@ -114,8 +114,8 @@ function Install-LocalSearch {
         # Add to PATH
         Add-ToPath -Directory $InstallDir
         
-        Write-Status "local-search installed successfully!"
-        Write-Status "Try running: local-search --help"
+        Write-Status "localsearch installed successfully!"
+        Write-Status "Try running: localsearch --help"
         
         return $true
         
@@ -133,7 +133,7 @@ if ($Help) {
     exit 0
 }
 
-Write-Status "Installing local-search CLI tool..."
+Write-Status "Installing localsearch CLI tool..."
 Write-Status "Installation directory: $InstallDir"
 Write-Status "GitHub repository: $GitHubRepo"
 

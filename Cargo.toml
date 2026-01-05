@@ -5,9 +5,9 @@ edition = "2024"
 authors = ["Naveen Anto <nnanto@github.com>"]
 description = "A fast, local search engine with vector embeddings and SQLite storage"
 license = "MIT"
-repository = "https://github.com/nnanto/local-search"
-homepage = "https://github.com/nnanto/local-search"
-documentation = "https://docs.rs/local-search"
+repository = "https://github.com/nnanto/localsearch"
+homepage = "https://github.com/nnanto/localsearch"
+documentation = "https://docs.rs/localsearch"
 keywords = ["search", "embeddings", "sqlite", "vector", "semantic"]
 categories = ["text-processing", "database"]
 readme = "README.md"
@@ -43,7 +43,7 @@ path = "src/lib.rs"
 
 
 [[bin]]
-name = "local-search"
+name = "localsearch"
 path = "src/bin/main.rs"
 required-features = ["cli"]
 

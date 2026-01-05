@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Release script for local-search
+# Release script for localsearch
 
 set -e
 
@@ -48,12 +48,12 @@ cargo doc --no-deps
 
 # Commit and tag
 echo "Creating git commit and tag..."
-git add Cargo.toml
+git add Cargo.*
 git commit -m "Release v$VERSION"
 git tag "v$VERSION"
 
 echo "Release v$VERSION prepared!"
 echo "Run 'git push origin main --tags' to publish the release"
 echo "Don't forget to:"
-echo "  1. Create a GitHub release at https://github.com/nnanto/local-search/releases/new"
+echo "  1. Create a GitHub release at https://github.com/nnanto/localsearch/releases/new"
 echo "  2. Set up CARGO_REGISTRY_TOKEN secret in GitHub for automatic publishing"

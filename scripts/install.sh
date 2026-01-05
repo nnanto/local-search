@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Installation script for local-search CLI tool
+# Installation script for localsearch CLI tool
 
 # Colors for output
 RED='\033[0;31m'
@@ -11,7 +11,7 @@ NC='\033[0m' # No Color
 
 # Default values
 INSTALL_DIR="/usr/local/bin"
-GITHUB_REPO="nnanto/local-search"
+GITHUB_REPO="nnanto/localsearch"
 
 # Function to print colored output
 print_status() {
@@ -58,9 +58,9 @@ command_exists() {
 }
 
 # Main installation function
-install_local-search() {
+install_localsearch() {
     local arch=$(get_architecture)
-    local archive_name="local-search-${arch}.tar.gz"
+    local archive_name="localsearch-${arch}.tar.gz"
     local download_url="https://github.com/${GITHUB_REPO}/releases/latest/download/${archive_name}"
     
     print_status "Detected architecture: $arch"
@@ -82,9 +82,9 @@ install_local-search() {
     cd "$tmp_dir"
     
     # Download and extract
-    print_status "Downloading local-search..."
+    print_status "Downloading localsearch..."
     if ! curl -sL "$download_url" | tar xz; then
-        print_error "Failed to download or extract local-search"
+        print_error "Failed to download or extract localsearch"
         exit 1
     fi
     
@@ -94,30 +94,30 @@ install_local-search() {
     # Check if we can write to install directory
     if [[ ! -w "$INSTALL_DIR" ]]; then
         print_warning "No write permission to $INSTALL_DIR, trying with sudo..."
-        if ! sudo mv local-search "$INSTALL_DIR/local-search"; then
-            print_error "Failed to install local-search to $INSTALL_DIR"
+        if ! sudo mv localsearch "$INSTALL_DIR/localsearch"; then
+            print_error "Failed to install localsearch to $INSTALL_DIR"
             exit 1
         fi
     else
-        if ! mv local-search "$INSTALL_DIR/local-search"; then
-            print_error "Failed to install local-search to $INSTALL_DIR"
+        if ! mv localsearch "$INSTALL_DIR/localsearch"; then
+            print_error "Failed to install localsearch to $INSTALL_DIR"
             exit 1
         fi
     fi
     
     # Make executable
-    if [[ ! -w "$INSTALL_DIR/local-search" ]]; then
-        sudo chmod +x "$INSTALL_DIR/local-search"
+    if [[ ! -w "$INSTALL_DIR/localsearch" ]]; then
+        sudo chmod +x "$INSTALL_DIR/localsearch"
     else
-        chmod +x "$INSTALL_DIR/local-search"
+        chmod +x "$INSTALL_DIR/localsearch"
     fi
     
     # Cleanup
     cd /
     rm -rf "$tmp_dir"
     
-    print_status "local-search installed successfully!"
-    print_status "Try running: local-search --help"
+    print_status "localsearch installed successfully!"
+    print_status "Try running: localsearch --help"
 }
 
 # Parse command line arguments
@@ -136,7 +136,7 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --install-dir DIR    Installation directory (default: /usr/local/bin)"
-            echo "  --repo REPO          GitHub repository (default: nnanto/local-search)"
+            echo "  --repo REPO          GitHub repository (default: nnanto/localsearch)"
             echo "  -h, --help           Show this help message"
             exit 0
             ;;
@@ -148,4 +148,4 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Run installation
-install_local-search
+install_localsearch

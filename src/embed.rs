@@ -1,8 +1,8 @@
+use crate::config::LocalSearchDirs;
 use anyhow::Result;
 use fastembed::{InitOptions, TextEmbedding};
 use log::{debug, info};
 use std::path::PathBuf;
-use crate::config::LocalSearchDirs;
 
 /// Local text embedding service using FastEmbed models.
 pub struct LocalEmbedder {
@@ -12,9 +12,12 @@ pub struct LocalEmbedder {
 impl LocalEmbedder {
     /// Creates a new embedder with the specified model or default AllMiniLML6V2.
     /// If cache_dir is provided, uses that; otherwise uses LocalSearchDirs default.
-    pub fn new(model_name: Option<fastembed::EmbeddingModel>, cache_dir: Option<PathBuf>) -> Result<Self> {
+    pub fn new(
+        model_name: Option<fastembed::EmbeddingModel>,
+        cache_dir: Option<PathBuf>,
+    ) -> Result<Self> {
         let model_name = model_name.unwrap_or(fastembed::EmbeddingModel::AllMiniLML6V2);
-        
+
         let cache_dir = match cache_dir {
             Some(dir) => dir,
             None => {
@@ -22,9 +25,8 @@ impl LocalEmbedder {
                 dirs.ensure_cache_dir()?
             }
         };
-        
-        let init_options = InitOptions::new(model_name.clone())
-            .with_cache_dir(cache_dir);
+
+        let init_options = InitOptions::new(model_name.clone()).with_cache_dir(cache_dir);
         let model = TextEmbedding::try_new(init_options)?;
 
         info!("Initialized embedding model: {:?}", model_name);

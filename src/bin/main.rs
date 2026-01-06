@@ -1,9 +1,11 @@
 mod util;
 
 use clap::{Parser, Subcommand};
-use localsearch::{LocalEmbedder, LocalSearch, SearchType, SqliteLocalSearchEngine, LocalSearchDirs};
-use util::{JsonFileIngestor, RawFileIngestor};
+use localsearch::{
+    LocalEmbedder, LocalSearch, LocalSearchDirs, SearchType, SqliteLocalSearchEngine,
+};
 use std::path::PathBuf;
+use util::{JsonFileIngestor, RawFileIngestor};
 
 use crate::util::ingest::IngestionResult;
 
@@ -127,7 +129,7 @@ fn main() -> anyhow::Result<()> {
                 Some(cache_path) => LocalEmbedder::new_with_cache_dir(cache_path)?,
                 None => LocalEmbedder::new_with_default_model()?,
             };
-            
+
             // Initialize the search engine
             let engine = SqliteLocalSearchEngine::new(&db_path, Some(embedder))?;
             engine.create_table()?;
@@ -197,16 +199,16 @@ fn main() -> anyhow::Result<()> {
             if pretty {
                 println!("Searching for: \"{}\"", query);
             }
-            
+
             let db_path = get_database_path(db)?;
             validate_db_presence(&db_path)?;
-            
+
             // Initialize the embedder with optional cache directory
             let embedder = match cache_dir {
                 Some(cache_path) => LocalEmbedder::new_with_cache_dir(cache_path)?,
                 None => LocalEmbedder::new_with_default_model()?,
             };
-            
+
             // Initialize the search engine
             let engine = SqliteLocalSearchEngine::new(&db_path, Some(embedder))?;
 

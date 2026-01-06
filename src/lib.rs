@@ -22,11 +22,11 @@
 //!
 //! // Create embedder (uses default cache directory)
 //! let embedder = LocalEmbedder::new_with_default_model()?;
-//! 
+//!
 //! // Or create embedder with custom cache directory
 //! // let cache_dir = dirs.ensure_cache_dir()?;
 //! // let embedder = LocalEmbedder::new_with_cache_dir(cache_dir)?;
-//! 
+//!
 //! let mut engine = SqliteLocalSearchEngine::new(&db_path.to_string_lossy(), Some(embedder))?;
 //!
 //! // Index a document

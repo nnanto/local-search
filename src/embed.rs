@@ -43,9 +43,9 @@ impl LocalEmbedder {
     pub fn normalize_l2(embedding: &[f32]) -> Vec<f32> {
         let norm = (embedding.iter().map(|x| x * x).sum::<f32>()).sqrt();
         debug!("Normalized embedding with L2 norm: {}", norm);
-        if norm < 1e-5 || (norm - 1.0).abs() < 1e-5 {
+        if norm < 1e-5 {
             debug!(
-                "Embedding norm {} is less than 1e-5 or close to 1.0, returning original embedding",
+                "Embedding norm {} is less than 1e-5, returning original embedding",
                 norm
             );
             embedding.to_vec()

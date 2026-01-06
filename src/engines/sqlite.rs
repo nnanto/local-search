@@ -46,7 +46,8 @@ impl SqliteLocalSearchEngine {
         self.conn.execute(
             "CREATE VIRTUAL TABLE documents_fts USING fts5(
                 path UNINDEXED,
-                content
+                content,
+                tokenize = 'porter ascii'
             )",
             [],
         )?;
@@ -218,7 +219,10 @@ impl SqliteLocalSearchEngine {
                 .collect();
 
             // Calculate cosine similarity
-            let similarity = self.cosine_similarity(query_embedding, &embedding);
+            let similarity = Self::cosine_similarity(query_embedding, &embedding);
+            if similarity < 1e-3 {
+                continue; // Skip low similarity results
+            }
 
             results.push(SearchResult {
                 path,
@@ -273,9 +277,10 @@ impl SqliteLocalSearchEngine {
              WHERE documents_fts MATCH ?1
              ORDER BY score",
         )?;
+
         let search_iter = stmt.query_map(rusqlite::params![query], |row| {
             let score: f64 = if let Ok(s) = row.get::<_, f64>(4) {
-                s * -1.0
+                -s
             } else {
                 0.0
             };
@@ -294,6 +299,18 @@ impl SqliteLocalSearchEngine {
         for result in search_iter {
             results.push(result?);
         }
+
+        // Apply softmax normalization to scores
+        let scores: Vec<f64> = results.iter().map(|r| r.fts_score.unwrap_or(0.0)).collect();
+
+        if !scores.is_empty() {
+            let normalized_scores = Self::softmax(&scores);
+            for (i, result) in results.iter_mut().enumerate() {
+                result.fts_score = Some(normalized_scores[i]);
+                result.final_score = normalized_scores[i];
+            }
+        }
+
         debug!(
             "Search for query '{}' returned {} results.",
             query,
@@ -302,7 +319,26 @@ impl SqliteLocalSearchEngine {
         Ok(results)
     }
 
-    fn cosine_similarity(&self, a: &[f32], b: &[f32]) -> f64 {
+    fn softmax(scores: &[f64]) -> Vec<f64> {
+        let max_score = scores.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+        let exp_scores: Vec<f64> = scores
+            .iter()
+            .map(|&score| (score - max_score).exp())
+            .collect();
+        let sum_exp: f64 = exp_scores.iter().sum();
+        exp_scores
+            .iter()
+            .map(|&exp_score| {
+                if sum_exp > 0.0 {
+                    exp_score / sum_exp
+                } else {
+                    1.0 / scores.len() as f64
+                }
+            })
+            .collect()
+    }
+
+    fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
         if a.len() != b.len() {
             return 0.0;
         }
@@ -540,7 +576,6 @@ mod tests {
     }
 
     #[test]
-
     fn test_engine_initialization() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
@@ -621,9 +656,9 @@ mod tests {
 
         // Search for "rust"
         let results = engine
-            .search("web", SearchType::FullText, Some(10))
+            .search("programming", SearchType::FullText, Some(10))
             .unwrap();
-        assert_eq!(results.len(), 1); // Should match rust1.txt
+        assert_eq!(results.len(), 2); // Should match rust1.txt
 
         // All results should have FTS scores but no semantic scores
         for result in &results {
@@ -637,7 +672,6 @@ mod tests {
     }
 
     #[test]
-
     fn test_semantic_search() {
         let (engine, _temp_dir) = create_test_engine_with_embedder();
 
@@ -703,7 +737,8 @@ mod tests {
         let mut found_both_scores = false;
         for result in &results {
             if result.fts_score.is_some() && result.semantic_score.is_some() {
-                found_both_scores = true;
+                found_both_scores |=
+                    result.fts_score.unwrap() > 0.01 && result.semantic_score.unwrap() > 0.01;
             }
             assert!(result.final_score > 0.0);
         }
@@ -715,29 +750,27 @@ mod tests {
 
     #[test]
     fn test_cosine_similarity() {
-        let (engine, _temp_dir) = create_test_engine();
-
         // Test identical vectors
         let vec1 = vec![1.0, 0.0, 0.0];
         let vec2 = vec![1.0, 0.0, 0.0];
-        let similarity = engine.cosine_similarity(&vec1, &vec2);
+        let similarity = SqliteLocalSearchEngine::cosine_similarity(&vec1, &vec2);
         assert!((similarity - 1.0).abs() < 0.001);
 
         // Test orthogonal vectors
         let vec3 = vec![1.0, 0.0, 0.0];
         let vec4 = vec![0.0, 1.0, 0.0];
-        let similarity = engine.cosine_similarity(&vec3, &vec4);
+        let similarity = SqliteLocalSearchEngine::cosine_similarity(&vec3, &vec4);
+        println!("Cosine similarity (orthogonal): {}", similarity);
         assert!((similarity - 0.0).abs() < 0.001);
 
         // Test different length vectors
         let vec5 = vec![1.0, 0.0];
         let vec6 = vec![1.0, 0.0, 0.0];
-        let similarity = engine.cosine_similarity(&vec5, &vec6);
+        let similarity = SqliteLocalSearchEngine::cosine_similarity(&vec5, &vec6);
         assert_eq!(similarity, 0.0);
     }
 
     #[test]
-
     fn test_refresh_connection() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
@@ -870,5 +903,71 @@ mod tests {
 
         let count = engine.stats().unwrap();
         assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_softmax() {
+        // Test basic softmax with different values
+        let scores = vec![1.0, 2.0, 3.0];
+        let result = SqliteLocalSearchEngine::softmax(&scores);
+
+        // Check that result sums to 1.0 (within floating point precision)
+        let sum: f64 = result.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-10);
+
+        // Check that higher scores get higher probabilities
+        assert!(result[2] > result[1]);
+        assert!(result[1] > result[0]);
+
+        // Check that all values are positive
+        for prob in &result {
+            assert!(*prob > 0.0);
+        }
+
+        // Test with identical values - should give equal probabilities
+        let equal_scores = vec![2.0, 2.0, 2.0];
+        let equal_result = SqliteLocalSearchEngine::softmax(&equal_scores);
+        let expected_prob = 1.0 / 3.0;
+        for prob in &equal_result {
+            assert!((prob - expected_prob).abs() < 1e-10);
+        }
+
+        // Test with negative values
+        let negative_scores = vec![-1.0, -2.0, -3.0];
+        let negative_result = SqliteLocalSearchEngine::softmax(&negative_scores);
+        let negative_sum: f64 = negative_result.iter().sum();
+        assert!((negative_sum - 1.0).abs() < 1e-10);
+
+        // Higher (less negative) scores should still get higher probabilities
+        assert!(negative_result[0] > negative_result[1]);
+        assert!(negative_result[1] > negative_result[2]);
+
+        // Test with all zeros
+        let zero_scores = vec![0.0, 0.0, 0.0];
+        let zero_result = SqliteLocalSearchEngine::softmax(&zero_scores);
+        let zero_sum: f64 = zero_result.iter().sum();
+        assert!((zero_sum - 1.0).abs() < 1e-10);
+        for prob in &zero_result {
+            assert!((prob - 1.0 / 3.0).abs() < 1e-10);
+        }
+
+        // Test with single value
+        let single_score = vec![5.0];
+        let single_result = SqliteLocalSearchEngine::softmax(&single_score);
+        assert_eq!(single_result.len(), 1);
+        assert!((single_result[0] - 1.0).abs() < 1e-10);
+
+        // Test with empty vector
+        let empty_scores: Vec<f64> = vec![];
+        let empty_result = SqliteLocalSearchEngine::softmax(&empty_scores);
+        assert!(empty_result.is_empty());
+
+        // Test with large values (numerical stability)
+        let large_scores = vec![1000.0, 1001.0, 1002.0];
+        let large_result = SqliteLocalSearchEngine::softmax(&large_scores);
+        let large_sum: f64 = large_result.iter().sum();
+        assert!((large_sum - 1.0).abs() < 1e-10);
+        assert!(large_result[2] > large_result[1]);
+        assert!(large_result[1] > large_result[0]);
     }
 }

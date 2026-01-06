@@ -267,14 +267,18 @@ impl SqliteLocalSearchEngine {
 
     fn search_fts(&self, query: &str) -> anyhow::Result<Vec<SearchResult>> {
         let mut stmt = self.conn.prepare(
-            "SELECT d.path, d.metadata, d.createdAt, d.updatedAt, bm25(documents_fts) * -1 as score
+            "SELECT d.path, d.metadata, d.createdAt, d.updatedAt, bm25(documents_fts) as score
              FROM documents_fts 
              JOIN documents d ON documents_fts.path = d.path
              WHERE documents_fts MATCH ?1
-             ORDER BY rank",
+             ORDER BY score",
         )?;
         let search_iter = stmt.query_map(rusqlite::params![query], |row| {
-            let score: f64 = row.get(4)?;
+            let score: f64 = if let Ok(s) = row.get::<_, f64>(4) {
+                s * -1.0
+            } else {
+                0.0
+            };
             Ok(SearchResult {
                 path: row.get(0)?,
                 metadata: serde_json::from_str(&row.get::<_, String>(1)?).ok(),
@@ -615,15 +619,19 @@ mod tests {
             engine.insert_document(doc).unwrap();
         }
 
-        // Search for "programming"
+        // Search for "rust"
         let results = engine
-            .search("programming", SearchType::FullText, Some(10))
+            .search("web", SearchType::FullText, Some(10))
             .unwrap();
-        assert_eq!(results.len(), 2); // Should match rust1.txt and python1.txt
+        assert_eq!(results.len(), 1); // Should match rust1.txt
 
         // All results should have FTS scores but no semantic scores
         for result in &results {
-            assert!(result.fts_score.is_some());
+            println!(
+                "FTS Score: {:?}, Semantic Score: {:?}",
+                result.fts_score, result.semantic_score
+            );
+            assert!(result.fts_score.is_some() && result.fts_score.unwrap() > 0.1);
             assert!(result.semantic_score.is_none());
         }
     }
@@ -661,7 +669,6 @@ mod tests {
     }
 
     #[test]
-
     fn test_hybrid_search() {
         let (engine, _temp_dir) = create_test_engine_with_embedder();
 

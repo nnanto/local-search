@@ -226,6 +226,9 @@ mod tests {
 
         let result = LocalEmbedder::new_with_local_model(onnx_path, tokenizer_dir, None);
         assert!(result.is_err());
+        if let Err(error) = result {
+            assert!(error.to_string().contains("Failed to read ONNX model"));
+        }
     }
 
     #[test]
@@ -245,5 +248,8 @@ mod tests {
             None,
         );
         assert!(result.is_err());
+        if let Err(error) = result {
+            assert!(error.to_string().contains("Failed to read"));
+        }
     }
 }

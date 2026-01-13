@@ -9,6 +9,7 @@
 //! - SQLite-based storage
 //! - Both library and CLI interfaces
 //! - Configurable cache and database directories using system directories
+//! - Support for custom local ONNX models and tokenizers
 //!
 //! ## Quick Start
 //!
@@ -26,6 +27,11 @@
 //! // Or create embedder with custom cache directory
 //! // let cache_dir = dirs.ensure_cache_dir()?;
 //! // let embedder = LocalEmbedder::new_with_cache_dir(cache_dir)?;
+//!
+//! // Or use your own local ONNX model
+//! // let onnx_path = std::path::PathBuf::from("/path/to/model.onnx");
+//! // let tokenizer_dir = std::path::PathBuf::from("/path/to/tokenizer");
+//! // let embedder = LocalEmbedder::new_with_local_model(onnx_path, tokenizer_dir, Some(512))?;
 //!
 //! let mut engine = SqliteLocalSearchEngine::new(&db_path.to_string_lossy(), Some(embedder))?;
 //!

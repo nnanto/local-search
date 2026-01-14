@@ -155,21 +155,20 @@ fn create_embedder(
             println!("Using tokenizer directory: {:?}", tokenizer_path);
             LocalEmbedder::new_with_local_model(model_path, tokenizer_path, max_tokens)
         }
-        (Some(_), None) => {
-            Err(anyhow::anyhow!(
-                "--tokenizer-dir must be specified when using --local-model-path"
-            ))
-        }
-        (None, Some(_)) => {
-            Err(anyhow::anyhow!(
-                "--local-model-path must be specified when using --tokenizer-dir"
-            ))
-        }
+        (Some(_), None) => Err(anyhow::anyhow!(
+            "--tokenizer-dir must be specified when using --local-model-path"
+        )),
+        (None, Some(_)) => Err(anyhow::anyhow!(
+            "--local-model-path must be specified when using --tokenizer-dir"
+        )),
         (None, None) => {
             // Use default or cache directory model
             match cache_dir {
                 Some(cache_path) => {
-                    println!("Using pre-built model with cache directory: {:?}", cache_path);
+                    println!(
+                        "Using pre-built model with cache directory: {:?}",
+                        cache_path
+                    );
                     LocalEmbedder::new_with_cache_dir(cache_path)
                 }
                 None => {

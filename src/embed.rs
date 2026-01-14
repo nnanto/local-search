@@ -7,7 +7,7 @@ use log::{debug, info};
 use std::{fs, path::PathBuf};
 
 /// Local text embedding service using FastEmbed models.
-/// 
+///
 /// Supports both pre-built models from the FastEmbed library and local ONNX models
 /// with custom tokenizers. Local models require an ONNX file and four tokenizer files:
 /// tokenizer.json, config.json, special_tokens_map.json, and tokenizer_config.json.
@@ -41,7 +41,7 @@ impl LocalEmbedder {
     }
 
     /// Creates a new embedder with local model files.
-    /// 
+    ///
     /// # Arguments
     /// * `onnx_model_path` - Path to the ONNX model file
     /// * `tokenizer_dir` - Path to directory containing tokenizer files:
@@ -56,8 +56,13 @@ impl LocalEmbedder {
         max_length: Option<usize>,
     ) -> Result<Self> {
         // Load ONNX model file
-        let onnx_file = fs::read(&onnx_model_path)
-            .map_err(|e| anyhow::anyhow!("Failed to read ONNX model from {:?}: {}", onnx_model_path, e))?;
+        let onnx_file = fs::read(&onnx_model_path).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to read ONNX model from {:?}: {}",
+                onnx_model_path,
+                e
+            )
+        })?;
 
         // Load tokenizer files
         let tokenizer_files = TokenizerFiles {
@@ -92,7 +97,7 @@ impl LocalEmbedder {
     }
 
     /// Creates a new embedder with local model files using individual file paths.
-    /// 
+    ///
     /// # Arguments
     /// * `onnx_model_path` - Path to the ONNX model file
     /// * `tokenizer_json_path` - Path to tokenizer.json
@@ -109,19 +114,44 @@ impl LocalEmbedder {
         max_length: Option<usize>,
     ) -> Result<Self> {
         // Load ONNX model file
-        let onnx_file = fs::read(&onnx_model_path)
-            .map_err(|e| anyhow::anyhow!("Failed to read ONNX model from {:?}: {}", onnx_model_path, e))?;
+        let onnx_file = fs::read(&onnx_model_path).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to read ONNX model from {:?}: {}",
+                onnx_model_path,
+                e
+            )
+        })?;
 
         // Load tokenizer files
         let tokenizer_files = TokenizerFiles {
-            tokenizer_file: fs::read(&tokenizer_json_path)
-                .map_err(|e| anyhow::anyhow!("Failed to read tokenizer.json from {:?}: {}", tokenizer_json_path, e))?,
-            config_file: fs::read(&config_json_path)
-                .map_err(|e| anyhow::anyhow!("Failed to read config.json from {:?}: {}", config_json_path, e))?,
-            special_tokens_map_file: fs::read(&special_tokens_map_path)
-                .map_err(|e| anyhow::anyhow!("Failed to read special_tokens_map.json from {:?}: {}", special_tokens_map_path, e))?,
-            tokenizer_config_file: fs::read(&tokenizer_config_path)
-                .map_err(|e| anyhow::anyhow!("Failed to read tokenizer_config.json from {:?}: {}", tokenizer_config_path, e))?,
+            tokenizer_file: fs::read(&tokenizer_json_path).map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to read tokenizer.json from {:?}: {}",
+                    tokenizer_json_path,
+                    e
+                )
+            })?,
+            config_file: fs::read(&config_json_path).map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to read config.json from {:?}: {}",
+                    config_json_path,
+                    e
+                )
+            })?,
+            special_tokens_map_file: fs::read(&special_tokens_map_path).map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to read special_tokens_map.json from {:?}: {}",
+                    special_tokens_map_path,
+                    e
+                )
+            })?,
+            tokenizer_config_file: fs::read(&tokenizer_config_path).map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to read tokenizer_config.json from {:?}: {}",
+                    tokenizer_config_path,
+                    e
+                )
+            })?,
         };
 
         // Create user-defined model

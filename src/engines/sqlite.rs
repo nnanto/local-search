@@ -3,6 +3,10 @@ use crate::{LocalEmbedder, traits::SearchResult};
 use anyhow::anyhow;
 use log::{debug, info};
 use rusqlite::Connection;
+use std::collections::HashMap;
+
+// Type alias for the complex embedding row tuple
+type EmbeddingRow = (String, Option<HashMap<String, String>>, f64, f64, Vec<u8>);
 
 pub struct SqliteLocalSearchEngine {
     db_path: String,
@@ -76,13 +80,13 @@ impl SqliteLocalSearchEngine {
         Ok(())
     }
 
-    fn search_semantic_only(&self, query: &str) -> anyhow::Result<Vec<SearchResult>> {
+    fn search_semantic_only(&self, query: &str, path_filters: Option<&[String]>) -> anyhow::Result<Vec<SearchResult>> {
         let embedder = self
             .embedder
             .as_ref()
             .ok_or_else(|| anyhow!("Semantic search requires an embedder"))?;
         let query_embedding = embedder.embed_text(query)?;
-        let semantic_results = self.search_by_embedding(&query_embedding)?;
+        let semantic_results = self.search_by_embedding(&query_embedding, path_filters)?;
         let results = semantic_results
             .into_iter()
             .map(|r| SearchResult {
@@ -98,20 +102,20 @@ impl SqliteLocalSearchEngine {
         Ok(results)
     }
 
-    fn search_hybrid(&self, query: &str) -> anyhow::Result<Vec<SearchResult>> {
+    fn search_hybrid(&self, query: &str, path_filters: Option<&[String]>) -> anyhow::Result<Vec<SearchResult>> {
         // If no embedder, fallback to FTS-only search
         if self.embedder.is_none() {
             debug!("No embedder available for hybrid search, falling back to FTS-only");
-            return self.search_fulltext_only(query);
+            return self.search_fulltext_only(query, path_filters);
         }
 
         // Get FTS results
-        let fts_results = self.search_fts(query).unwrap_or_default();
+        let fts_results = self.search_fts(query, path_filters).unwrap_or_default();
 
         // Get semantic results
         let query_embedding = self.embedder.as_ref().unwrap().embed_text(query)?;
         let semantic_results = self
-            .search_by_embedding(&query_embedding)
+            .search_by_embedding(&query_embedding, path_filters)
             .unwrap_or_default();
 
         // Combine and normalize scores
@@ -184,28 +188,50 @@ impl SqliteLocalSearchEngine {
         Ok(final_results)
     }
 
-    fn search_by_embedding(&self, query_embedding: &[f32]) -> anyhow::Result<Vec<SearchResult>> {
+    fn search_by_embedding(&self, query_embedding: &[f32], path_filters: Option<&[String]>) -> anyhow::Result<Vec<SearchResult>> {
+        let (sql, params): (String, Vec<String>) = if let Some(filters) = path_filters.filter(|f| !f.is_empty()) {
+            let like_conditions = filters.iter().map(|_| "d.path LIKE '%' || ? || '%'").collect::<Vec<_>>().join(" OR ");
+            (
+                format!(
+                    "SELECT d.path, d.metadata, d.createdAt, d.updatedAt, e.embedding
+                     FROM documents d 
+                     JOIN document_embeddings e ON d.path = e.path
+                     WHERE {}",
+                    like_conditions
+                ),
+                filters.to_vec()
+            )
+        } else {
+            (
+                "SELECT d.path, d.metadata, d.createdAt, d.updatedAt, e.embedding
+                 FROM documents d 
+                 JOIN document_embeddings e ON d.path = e.path".to_string(),
+                vec![]
+            )
+        };
+        
         let mut stmt = self
             .conn
-            .prepare(
-                "SELECT d.path, d.metadata, d.createdAt, d.updatedAt, e.embedding
-             FROM documents d 
-             JOIN document_embeddings e ON d.path = e.path",
-            )
+            .prepare(&sql)
             .map_err(|e| anyhow!("Failed to prepare semantic search query: {}", e))?;
 
-        let embedding_iter = stmt
-            .query_map([], |row| {
-                let path: String = row.get(0)?;
-                let metadata_str: String = row.get(1)?;
-                let metadata: Option<std::collections::HashMap<String, String>> =
-                    serde_json::from_str(&metadata_str).ok();
-                let created_at: f64 = row.get(2)?;
-                let updated_at: f64 = row.get(3)?;
-                let embedding_bytes: Vec<u8> = row.get(4)?;
-                Ok((path, metadata, created_at, updated_at, embedding_bytes))
-            })
-            .map_err(|e| anyhow!("Failed to query embeddings: {}", e))?;
+        let row_mapper = |row: &rusqlite::Row<'_>| -> rusqlite::Result<EmbeddingRow> {
+            let path: String = row.get(0)?;
+            let metadata_str: String = row.get(1)?;
+            let metadata: Option<HashMap<String, String>> =
+                serde_json::from_str(&metadata_str).ok();
+            let created_at: f64 = row.get(2)?;
+            let updated_at: f64 = row.get(3)?;
+            let embedding_bytes: Vec<u8> = row.get(4)?;
+            Ok((path, metadata, created_at, updated_at, embedding_bytes))
+        };
+
+        let embedding_iter = if params.is_empty() {
+            stmt.query_map([], row_mapper)
+        } else {
+            let params_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
+            stmt.query_map(params_refs.as_slice(), row_mapper)
+        }.map_err(|e| anyhow!("Failed to query embeddings: {}", e))?;
 
         let mut results = Vec::new();
         for result in embedding_iter {
@@ -247,8 +273,8 @@ impl SqliteLocalSearchEngine {
         Ok(results)
     }
 
-    fn search_fulltext_only(&self, query: &str) -> anyhow::Result<Vec<SearchResult>> {
-        let fts_results = self.search_fts(query)?;
+    fn search_fulltext_only(&self, query: &str, path_filters: Option<&[String]>) -> anyhow::Result<Vec<SearchResult>> {
+        let fts_results = self.search_fts(query, path_filters)?;
         info!(
             "Full-text search for query '{}' returned {} results.",
             query,
@@ -269,16 +295,38 @@ impl SqliteLocalSearchEngine {
         Ok(results)
     }
 
-    fn search_fts(&self, query: &str) -> anyhow::Result<Vec<SearchResult>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT d.path, d.metadata, d.createdAt, d.updatedAt, bm25(documents_fts) as score
-             FROM documents_fts 
-             JOIN documents d ON documents_fts.path = d.path
-             WHERE documents_fts MATCH ?1
-             ORDER BY score",
-        )?;
+    fn search_fts(&self, query: &str, path_filters: Option<&[String]>) -> anyhow::Result<Vec<SearchResult>> {
+        let (sql, params): (String, Vec<String>) = if let Some(filters) = path_filters.filter(|f| !f.is_empty()) {
+            let like_conditions = filters.iter().map(|_| "d.path LIKE '%' || ? || '%'").collect::<Vec<_>>().join(" OR ");
+            (
+                format!(
+                    "SELECT d.path, d.metadata, d.createdAt, d.updatedAt, bm25(documents_fts) as score
+                     FROM documents_fts 
+                     JOIN documents d ON documents_fts.path = d.path
+                     WHERE documents_fts MATCH ?1 AND ({})
+                     ORDER BY score",
+                    like_conditions
+                ),
+                {
+                    let mut p = vec![query.to_string()];
+                    p.extend(filters.iter().cloned());
+                    p
+                }
+            )
+        } else {
+            (
+                "SELECT d.path, d.metadata, d.createdAt, d.updatedAt, bm25(documents_fts) as score
+                 FROM documents_fts 
+                 JOIN documents d ON documents_fts.path = d.path
+                 WHERE documents_fts MATCH ?1
+                 ORDER BY score".to_string(),
+                vec![query.to_string()]
+            )
+        };
+        
+        let mut stmt = self.conn.prepare(&sql)?;
 
-        let search_iter = stmt.query_map(rusqlite::params![query], |row| {
+        let row_mapper = |row: &rusqlite::Row<'_>| -> rusqlite::Result<SearchResult> {
             let score: f64 = if let Ok(s) = row.get::<_, f64>(4) {
                 -s
             } else {
@@ -293,7 +341,12 @@ impl SqliteLocalSearchEngine {
                 semantic_score: None,
                 final_score: score,
             })
-        })?;
+        };
+
+        let search_iter = {
+            let params_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
+            stmt.query_map(params_refs.as_slice(), row_mapper)?
+        };
 
         let mut results = Vec::new();
         for result in search_iter {
@@ -522,16 +575,17 @@ impl LocalSearch for SqliteLocalSearchEngine {
         query: &str,
         search_type: SearchType,
         top: Option<i8>,
+        path_filters: Option<&[String]>,
     ) -> anyhow::Result<Vec<SearchResult>> {
         let res = match search_type {
-            SearchType::FullText => self.search_fulltext_only(query),
+            SearchType::FullText => self.search_fulltext_only(query, path_filters),
             SearchType::Semantic => {
                 if self.embedder.is_none() {
                     return Err(anyhow!("Semantic search requires an embedder"));
                 }
-                self.search_semantic_only(query)
+                self.search_semantic_only(query, path_filters)
             }
-            SearchType::Hybrid => self.search_hybrid(query),
+            SearchType::Hybrid => self.search_hybrid(query, path_filters),
         }?;
         let limit = std::cmp::min(top.unwrap_or(10) as usize, res.len());
         Ok(res.into_iter().take(limit).collect::<Vec<_>>())
@@ -656,7 +710,7 @@ mod tests {
 
         // Search for "rust"
         let results = engine
-            .search("programming", SearchType::FullText, Some(10))
+            .search("programming", SearchType::FullText, Some(10), None)
             .unwrap();
         assert_eq!(results.len(), 2); // Should match rust1.txt
 
@@ -688,7 +742,7 @@ mod tests {
 
         // Search for "vehicle" (semantically related to car content)
         let results = engine
-            .search("vehicle transportation", SearchType::Semantic, Some(10))
+            .search("vehicle transportation", SearchType::Semantic, Some(10), None)
             .unwrap();
         assert!(!results.is_empty());
 
@@ -722,7 +776,7 @@ mod tests {
 
         // Hybrid search combining keyword and semantic matching
         let results = engine
-            .search("programming", SearchType::Hybrid, Some(10))
+            .search("programming", SearchType::Hybrid, Some(10), None)
             .unwrap();
         assert!(!results.is_empty());
         println!("Hybrid search results:");
@@ -813,7 +867,7 @@ mod tests {
 
         // Verify specific documents exist
         let results = engine
-            .search("Different", SearchType::FullText, Some(10))
+            .search("Different", SearchType::FullText, Some(10), None)
             .unwrap();
         assert!(!results.is_empty());
     }
@@ -832,17 +886,17 @@ mod tests {
 
         // Search empty database - FTS should work without embedder
         let results = engine
-            .search("nonexistent query", SearchType::FullText, Some(10))
+            .search("nonexistent query", SearchType::FullText, Some(10), None)
             .unwrap();
         assert!(results.is_empty());
 
         // Semantic search should fail without embedder
-        let semantic_result = engine.search("nonexistent query", SearchType::Semantic, Some(10));
+        let semantic_result = engine.search("nonexistent query", SearchType::Semantic, Some(10), None);
         assert!(semantic_result.is_err());
 
         // Hybrid should fallback to FTS without embedder
         let results = engine
-            .search("nonexistent query", SearchType::Hybrid, Some(10))
+            .search("nonexistent query", SearchType::Hybrid, Some(10), None)
             .unwrap();
         assert!(results.is_empty());
     }
@@ -854,12 +908,12 @@ mod tests {
         let (engine_with_embedder, _temp_dir2) = create_test_engine_with_embedder();
 
         let results = engine_with_embedder
-            .search("nonexistent query", SearchType::Semantic, Some(10))
+            .search("nonexistent query", SearchType::Semantic, Some(10), None)
             .unwrap();
         assert!(results.is_empty());
 
         let results = engine_with_embedder
-            .search("nonexistent query", SearchType::Hybrid, Some(10))
+            .search("nonexistent query", SearchType::Hybrid, Some(10), None)
             .unwrap();
         assert!(results.is_empty());
     }
@@ -969,5 +1023,55 @@ mod tests {
         assert!((large_sum - 1.0).abs() < 1e-10);
         assert!(large_result[2] > large_result[1]);
         assert!(large_result[1] > large_result[0]);
+    }
+
+    #[test]
+    fn test_path_filter_functionality() {
+        let (engine, _temp_dir) = create_test_engine();
+
+        // Create test documents with different paths
+        let docs = vec![
+            create_test_document("src/main.rs", "Rust programming language"),
+            create_test_document("src/lib.rs", "Library code in Rust"),
+            create_test_document("docs/readme.md", "Documentation for the project"),
+            create_test_document("tests/unit_test.rs", "Unit tests in Rust"),
+        ];
+
+        for doc in docs {
+            engine.insert_document(doc).expect("Failed to insert document");
+        }
+
+        // Test search without filter
+        let results_no_filter = engine
+            .search("Rust", SearchType::FullText, Some(10), None)
+            .unwrap();
+        assert_eq!(results_no_filter.len(), 3); // Should match main.rs, lib.rs, and unit_test.rs
+
+        // Test search with src filter (substring matching)
+        let results_src_filter = engine
+            .search("Rust", SearchType::FullText, Some(10), Some(&["src".to_string()]))
+            .unwrap();
+        assert_eq!(results_src_filter.len(), 2); // Should match main.rs and lib.rs
+        assert!(results_src_filter.iter().all(|r| r.path.contains("src")));
+
+        // Test search with .md filter
+        let results_md_filter = engine
+            .search("Documentation", SearchType::FullText, Some(10), Some(&[".md".to_string()]))
+            .unwrap();
+        assert_eq!(results_md_filter.len(), 1); // Should match readme.md
+        assert!(results_md_filter[0].path.ends_with(".md"));
+
+        // Test search with multiple filters
+        let results_multi_filter = engine
+            .search("Rust", SearchType::FullText, Some(10), Some(&["main".to_string(), "test".to_string()]))
+            .unwrap();
+        assert_eq!(results_multi_filter.len(), 2); // Should match main.rs and unit_test.rs
+        assert!(results_multi_filter.iter().all(|r| r.path.contains("main") || r.path.contains("test")));
+
+        // Test search with filter that matches nothing
+        let results_empty_filter = engine
+            .search("Rust", SearchType::FullText, Some(10), Some(&["python".to_string()]))
+            .unwrap();
+        assert_eq!(results_empty_filter.len(), 0); // Should match nothing
     }
 }

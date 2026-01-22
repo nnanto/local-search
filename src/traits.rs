@@ -44,5 +44,6 @@ pub trait LocalSearch {
         query: &str,
         search_type: SearchType,
         top: Option<i8>,
+        path_filters: Option<&[String]>,
     ) -> anyhow::Result<Vec<SearchResult>>;
 }

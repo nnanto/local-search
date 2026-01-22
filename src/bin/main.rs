@@ -117,6 +117,12 @@ enum Commands {
             help = "Output search results in pretty format instead of json text."
         )]
         pretty: bool,
+        /// Filter search results by path pattern (supports multiple patterns)
+        #[clap(
+            long,
+            help = "Filter search results to include documents whose path contains any of these patterns. Supports multiple comma-separated patterns like 'src,test' or 'main.rs,lib.rs'. Uses case-insensitive substring matching."
+        )]
+        path_filter: Option<String>,
     },
 }
 
@@ -273,6 +279,7 @@ fn main() -> anyhow::Result<()> {
             search_type,
             limit,
             pretty,
+            path_filter,
         } => {
             if pretty {
                 println!("Searching for: \"{}\"", query);
@@ -295,7 +302,13 @@ fn main() -> anyhow::Result<()> {
             };
 
             // Perform search
-            let results = engine.search(&query, search_type_enum, Some(limit as i8))?;
+            let path_filters = path_filter.as_ref().map(|f| {
+                f.split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect::<Vec<String>>()
+            });
+            let results = engine.search(&query, search_type_enum, Some(limit as i8), path_filters.as_deref())?;
 
             if !pretty {
                 // Output as JSON

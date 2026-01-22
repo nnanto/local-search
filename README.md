@@ -195,6 +195,35 @@ localsearch search "query" --limit 5
 localsearch search "query" --pretty
 ```
 
+### Path Filtering
+
+Filter search results to only include documents whose paths contain specific patterns:
+
+```bash
+# Search only in documents with "src" in the path
+localsearch search "function" --path-filter "src"
+
+# Search in multiple path patterns (OR logic)
+localsearch search "test" --path-filter "src,test,doc"
+
+# Mix different types of patterns
+localsearch search "config" --path-filter "settings,config.json,main"
+
+# Case-insensitive substring matching
+localsearch search "data" --path-filter "API,database,models"
+
+# Use with other options
+localsearch search "error" --path-filter "src,lib" --search-type semantic --pretty
+```
+
+**How Path Filtering Works:**
+- Uses case-insensitive substring matching
+- Multiple patterns are separated by commas
+- Results match if the path contains ANY of the specified patterns (OR logic)
+- Examples:
+  - `"src"` matches: `src/main.rs`, `my_src_file.txt`, `project/src/lib.rs`
+  - `"src,test"` matches: `src/main.rs`, `tests/unit.rs`, `src_backup.txt`
+
 ## Library Usage
 
 ```rust
@@ -225,10 +254,46 @@ fn main() -> anyhow::Result<()> {
     })?;
 
     // Search
-    let results = engine.search("example", SearchType::Hybrid, Some(10))?;
-    Ok(())
+    let results = engine.search("example", SearchType::Hybrid, Some(10))?;    
+    // Search with path filters (multiple patterns supported)
+    let filters = vec!["src".to_string(), "test".to_string()];
+    let filtered_results = engine.search("example", SearchType::Hybrid, Some(10), Some(&filters))?;    Ok(())
 }
 ```
+
+### Path Filtering in Library
+
+```rust
+use localsearch::{SqliteLocalSearchEngine, LocalEmbedder, LocalSearch, SearchType};
+
+fn search_examples(engine: &SqliteLocalSearchEngine) -> anyhow::Result<()> {
+    // Search all documents
+    let all_results = engine.search("rust programming", SearchType::Hybrid, Some(10), None)?;
+    
+    // Search only in source files
+    let src_filter = vec!["src".to_string()];
+    let src_results = engine.search("function", SearchType::Semantic, Some(5), Some(&src_filter))?;
+    
+    // Search in multiple path patterns
+    let multi_filters = vec!["src".to_string(), "test".to_string(), "doc".to_string()];
+    let filtered_results = engine.search(
+        "example code", 
+        SearchType::Hybrid, 
+        Some(10), 
+        Some(&multi_filters)
+    )?;
+    
+    // Search with specific file patterns
+    let file_filters = vec!["main.rs".to_string(), "lib.rs".to_string()];
+    let file_results = engine.search(
+        "implementation", 
+        SearchType::FullText, 
+        Some(3), 
+        Some(&file_filters)
+    )?;
+    
+    Ok(())
+}
 
 ### Using Local ONNX Models
 

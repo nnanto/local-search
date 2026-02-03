@@ -34,6 +34,14 @@ if "%SHOW_HELP%"=="1" (
     exit /b 0
 )
 
+:: Check for administrator privileges
+call :check_admin
+if errorlevel 1 (
+    echo [WARN] Not running as Administrator. Will attempt to add to system PATH anyway.
+    echo [WARN] If PATH modification fails, please run as Administrator.
+    echo.
+)
+
 :: Main installation
 echo [INFO] Installing localsearch CLI tool...
 echo [INFO] Installation directory: %INSTALL_DIR%
@@ -66,6 +74,15 @@ echo.
 echo Examples:
 echo   install.bat
 echo   install.bat -InstallDir "C:\Tools\localsearch"
+echo.
+echo Note: This script adds to the SYSTEM PATH (global). Administrator privileges are recommended.
+exit /b 0
+
+:check_admin
+net session >nul 2>&1
+if errorlevel 1 (
+    exit /b 1
+)
 exit /b 0
 
 :install_localsearch
@@ -126,6 +143,8 @@ if errorlevel 1 (
 call :add_to_path "%INSTALL_DIR%"
 
 echo [INFO] localsearch installed successfully!
+echo [INFO] Binary location: %TARGET_PATH%
+echo [INFO] Added to SYSTEM PATH (global - available to all users)
 echo [INFO] Try running: localsearch --help
 echo [INFO] You may need to restart your terminal for PATH changes to take effect.
 
@@ -143,30 +162,34 @@ if not errorlevel 1 (
     exit /b 0
 )
 
-echo [INFO] Adding %DIR_TO_ADD% to PATH...
+echo [INFO] Adding %DIR_TO_ADD% to SYSTEM PATH (global)...
 
-:: Get current user PATH
-for /f "skip=2 tokens=3*" %%A in ('reg query "HKCU\Environment" /v PATH 2^>nul') do set "USER_PATH=%%A %%B"
+:: Get current system PATH
+for /f "skip=2 tokens=3*" %%A in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v PATH 2^>nul') do set "SYSTEM_PATH=%%A %%B"
 
 :: Remove trailing space if exists
-set "USER_PATH=!USER_PATH:~0,-1!"
+if defined SYSTEM_PATH (
+    set "SYSTEM_PATH=!SYSTEM_PATH:~0,-1!"
+)
 
-:: Add new directory to PATH
-if "!USER_PATH!"=="" (
-    setx PATH "%DIR_TO_ADD%" >nul
+:: Add new directory to system PATH
+if "!SYSTEM_PATH!"=="" (
+    setx PATH "%DIR_TO_ADD%" /M >nul 2>&1
 ) else (
-    setx PATH "!USER_PATH!;%DIR_TO_ADD!" >nul
+    setx PATH "!SYSTEM_PATH!;%DIR_TO_ADD!" /M >nul 2>&1
 )
 
 if errorlevel 1 (
-    echo [WARN] Failed to add to PATH automatically. Please add manually: %DIR_TO_ADD%
+    echo [ERROR] Failed to add to system PATH. Please run as Administrator or add manually: %DIR_TO_ADD%
+    echo [INFO] To add manually, add this directory to System Environment Variables.
     exit /b 1
 )
 
 :: Update PATH for current session
 set "PATH=%PATH%;%DIR_TO_ADD%"
 
-echo [INFO] Added to PATH. Please restart your terminal for changes to take effect.
+echo [INFO] Added to SYSTEM PATH successfully!
+echo [INFO] Please restart your terminal for changes to take effect.
 exit /b 0
 
 :cleanup
